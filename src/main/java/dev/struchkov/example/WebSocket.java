@@ -1,5 +1,12 @@
 package dev.struchkov.example;
 
+import dev.struchkov.example.convert.EventContainerDecoder;
+import dev.struchkov.example.convert.EventContainerEncoder;
+import dev.struchkov.example.domain.EventContainer;
+import dev.struchkov.example.domain.input.ChatInputMessage;
+import dev.struchkov.example.domain.input.ChatViewInput;
+import dev.struchkov.example.domain.output.ChatOutputMessage;
+import dev.struchkov.example.domain.output.ChatViewOutput;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.websocket.OnClose;
 import jakarta.websocket.OnError;
@@ -10,6 +17,7 @@ import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -20,11 +28,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 @ServerEndpoint(
         value = "/chat/{chatId}",
-        decoders = ChatMessageDecoder.class,
-        encoders = ChatMessageEncoder.class
+        decoders = EventContainerDecoder.class,
+        encoders = EventContainerEncoder.class
 )
 @RequiredArgsConstructor
-public class StartWebSocket {
+public class WebSocket {
 
     public static final ThreadLocal<UUID> CURRENT_USER = new ThreadLocal<>();
     private final Map<String, List<Session>> sessions = new ConcurrentHashMap<>();
@@ -47,9 +55,30 @@ public class StartWebSocket {
     }
 
     @OnMessage
-    public void onMessage(Session session, @PathParam("chatId") String chatId, ChatInputMessage message) {
-        System.out.println("onMessage> " + chatId + ": " + message);
-        sendMessage(session, chatId, message);
+    public void onMessage(Session session, @PathParam("chatId") String chatId, EventContainer event) {
+        System.out.println("onMessage> " + chatId + ": " + event);
+        switch (event.getEventType()) {
+            case MESSAGE_NEW -> sendMessage(session, chatId, (ChatInputMessage) event.getEvent());
+            case MESSAGE_VIEWED -> viewMessage(session, chatId, (ChatViewInput) event.getEvent());
+        }
+    }
+
+    private void viewMessage(Session session, String chatId, ChatViewInput viewInput) {
+        final List<Session> chatSessions = sessions.get(chatId);
+        for (Session chatSession : chatSessions) {
+            if (session.getId().equals(chatSession.getId())) {
+                continue;
+            }
+            final UUID fromUserId = CURRENT_USER.get();
+            final ChatViewOutput chatViewOutput = new ChatViewOutput(
+                    viewInput.getMessageId(),
+                    fromUserId,
+                    LocalDateTime.now()
+            );
+            final EventContainer eventContainer = EventContainer.viewedOutput(chatViewOutput);
+            chatSession.getAsyncRemote().sendObject(eventContainer);
+            CURRENT_USER.remove();
+        }
     }
 
     private void sendMessage(Session session, String chatId, ChatInputMessage message) {
@@ -60,7 +89,8 @@ public class StartWebSocket {
             }
             final UUID fromUserId = CURRENT_USER.get();
             final ChatOutputMessage outputMessage = new ChatOutputMessage(fromUserId, message.getText());
-            chatSession.getAsyncRemote().sendObject(outputMessage);
+            final EventContainer eventContainer = EventContainer.messageOutput(outputMessage);
+            chatSession.getAsyncRemote().sendObject(eventContainer);
             CURRENT_USER.remove();
         }
     }

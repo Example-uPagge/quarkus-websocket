@@ -1,4 +1,4 @@
-package dev.struchkov.example;
+package dev.struchkov.example.domain.output;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

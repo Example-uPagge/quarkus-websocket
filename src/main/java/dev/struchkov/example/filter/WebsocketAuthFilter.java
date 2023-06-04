@@ -1,5 +1,6 @@
-package dev.struchkov.example;
+package dev.struchkov.example.filter;
 
+import dev.struchkov.example.WebSocket;
 import io.quarkus.vertx.web.RouteFilter;
 import io.vertx.core.http.Cookie;
 import io.vertx.core.http.HttpServerRequest;
@@ -39,10 +40,10 @@ public class WebsocketAuthFilter {
     private boolean authLogic(String sessionId) {
         // your auth logic here
         if (sessionId.equals("user1")) {
-            StartWebSocket.CURRENT_USER.set(UUID.fromString("09e429de-a302-40b6-9d10-6b113ab9e89d"));
+            WebSocket.CURRENT_USER.set(UUID.fromString("09e429de-a302-40b6-9d10-6b113ab9e89d"));
             return true;
         } else if (sessionId.equals("user2")) {
-            StartWebSocket.CURRENT_USER.set(UUID.fromString("f84dbae1-f9a9-4c37-8922-4eb207103676"));
+            WebSocket.CURRENT_USER.set(UUID.fromString("f84dbae1-f9a9-4c37-8922-4eb207103676"));
             return true;
         } else {
             return false;

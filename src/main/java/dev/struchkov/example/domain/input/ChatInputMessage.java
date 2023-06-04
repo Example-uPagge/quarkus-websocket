@@ -1,4 +1,4 @@
-package dev.struchkov.example;
+package dev.struchkov.example.domain.input;
 
 import lombok.Getter;
 import lombok.Setter;
