@@ -1,9 +1,10 @@
-package dev.struchkov.example;
+package dev.struchkov.example.converter;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.struchkov.example.domain.ChatInputMessage;
 import jakarta.websocket.DecodeException;
 import jakarta.websocket.Decoder;
 import lombok.SneakyThrows;

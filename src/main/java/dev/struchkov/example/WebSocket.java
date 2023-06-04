@@ -1,5 +1,10 @@
 package dev.struchkov.example;
 
+import dev.struchkov.example.converter.ChatMessageDecoder;
+import dev.struchkov.example.converter.ChatMessageEncoder;
+import dev.struchkov.example.domain.ChatInputMessage;
+import dev.struchkov.example.domain.ChatOutputMessage;
+import io.vertx.ext.web.handler.HttpException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.websocket.OnClose;
 import jakarta.websocket.OnError;
@@ -21,29 +26,53 @@ import java.util.concurrent.ConcurrentHashMap;
 @ServerEndpoint(
         value = "/chat/{chatId}",
         decoders = ChatMessageDecoder.class,
-        encoders = ChatMessageEncoder.class
+        encoders = ChatMessageEncoder.class,
+        configurator = CustomConfigurator.class
 )
 @RequiredArgsConstructor
-public class StartWebSocket {
+public class WebSocket {
 
-    public static final ThreadLocal<UUID> CURRENT_USER = new ThreadLocal<>();
     private final Map<String, List<Session>> sessions = new ConcurrentHashMap<>();
 
     @OnOpen
     public void onOpen(Session session, @PathParam("chatId") String chatId) {
         System.out.println("onOpen> " + chatId);
+        final String authCookieValue = (String) session.getUserProperties().get("sessionId");
+        final UUID authUserId = getAuthUser(authCookieValue);
+        session.getUserProperties().put("userId", authUserId);
         sessions.computeIfAbsent(chatId, key -> new ArrayList<>()).add(session);
+    }
+
+    private UUID getAuthUser(String authCookieValue) {
+        // your auth logic here
+        if (authCookieValue == null) throw new HttpException(401, "Не передан параметр авторизации.");
+        if (authCookieValue.equals("user1")) return UUID.fromString("09e429de-a302-40b6-9d10-6b113ab9e89d");
+        if (authCookieValue.equals("user2")) return UUID.fromString("f84dbae1-f9a9-4c37-8922-4eb207103676");
+        throw new HttpException(403, "Пользователь не авторизован.");
+    }
+
+    @OnError
+    public void onError(Session session, @PathParam("chatId") String chatId, Throwable throwable) {
+        if (throwable instanceof HttpException httpException) {
+            final int statusCode = httpException.getStatusCode();
+            if (statusCode == 401) {
+                session.getAsyncRemote().sendText("Вы не авторизованы.");
+                closeSession(session, chatId);
+                return;
+            }
+            if (statusCode == 403) {
+                session.getAsyncRemote().sendText("Доступ запрещен.");
+                closeSession(session, chatId);
+                return;
+            }
+        }
+        System.out.println("onError> " + chatId + ": " + throwable);
     }
 
     @OnClose
     public void onClose(Session session, @PathParam("chatId") String chatId) {
         System.out.println("onClose> " + chatId);
         closeSession(session, chatId);
-    }
-
-    @OnError
-    public void onError(Session session, @PathParam("chatId") String chatId, Throwable throwable) {
-        System.out.println("onError> " + chatId + ": " + throwable);
     }
 
     @OnMessage
@@ -58,10 +87,9 @@ public class StartWebSocket {
             if (session.getId().equals(chatSession.getId())) {
                 continue;
             }
-            final UUID fromUserId = CURRENT_USER.get();
+            final UUID fromUserId = (UUID) session.getUserProperties().get("userId");
             final ChatOutputMessage outputMessage = new ChatOutputMessage(fromUserId, message.getText());
             chatSession.getAsyncRemote().sendObject(outputMessage);
-            CURRENT_USER.remove();
         }
     }
 

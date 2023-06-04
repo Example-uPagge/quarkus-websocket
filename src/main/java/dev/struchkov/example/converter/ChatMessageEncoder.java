@@ -1,6 +1,7 @@
-package dev.struchkov.example;
+package dev.struchkov.example.converter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.struchkov.example.domain.ChatOutputMessage;
 import jakarta.websocket.EncodeException;
 import jakarta.websocket.Encoder;
 import lombok.SneakyThrows;
